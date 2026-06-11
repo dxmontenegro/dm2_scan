@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liberação de Aluno</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+margin:0;
+padding:10px;
+padding-bottom:90px;
+text-align:center;
+}
+
+/* TOPO */
+.topo{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:10px;
+}
+
+.voltar{
+background:#334155;
+padding:8px 12px;
+border-radius:6px;
+cursor:pointer;
+}
+
+/* CONTAINER */
+.container{
+background:#1e293b;
+padding:15px;
+border-radius:12px;
+max-width:600px;
+margin:auto;
+}
+
+/* SCANNER (INALTERADO) */
+#reader{
+width:100%;
+aspect-ratio:16/9;
+margin:auto;
+border-radius:10px;
+overflow:hidden;
+position:relative;
+background:black;
+}
+
+#reader video,
+#reader canvas{
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+object-fit:cover;
+}
+
+/* LASER */
+#reader::after{
+content:"";
+position:absolute;
+left:10%;
+width:80%;
+height:2px;
+background:red;
+top:50%;
+animation:laser 2s infinite;
+}
+
+@keyframes laser{
+0%{top:20%;}
+50%{top:80%;}
+100%{top:20%;}
+}
+
+/* INPUT */
+input, select{
+padding:10px;
+margin-top:8px;
+width:100%;
+border-radius:6px;
+border:none;
+font-size:16px;
+}
+
+/* BOTÕES */
+button{
+padding:10px;
+margin-top:8px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+font-weight:bold;
+}
+
+/* 🔥 BOTÕES LADO A LADO */
+.botoes-linha{
+display:flex;
+gap:10px;
+margin-top:10px;
+}
+
+.btn-verde{
+background:#16a34a;
+color:white;
+flex:1;
+}
+
+.btn-verde:hover{
+background:#15803d;
+}
+
+.btn-vermelho{
+background:#dc2626;
+color:white;
+flex:1;
+}
+
+.btn-vermelho:hover{
+background:#b91c1c;
+}
+
+/* BOTÃO BUSCAR */
+.btn-buscar{
+width:100%;
+background:#2563eb;
+color:white;
+}
+
+.btn-buscar:hover{
+background:#1d4ed8;
+}
+
+/* INFO */
+.info{
+margin-top:10px;
+background:#0f172a;
+padding:12px;
+border-radius:8px;
+text-align:left;
+}
+
+/* FOOTER */
+footer{
+position:fixed;
+bottom:0;
+width:100%;
+background:#1e293b;
+padding:6px;
+font-size:12px;
+border-top:1px solid #334155;
+}
+
+footer p{margin:2px;}
+
+</style>
+</head>
+
+<body>
+
+    <script>
+document.addEventListener("click", () => {
+const audio = document.getElementById("beep")
+audio.play().then(()=> {
+audio.pause()
+audio.currentTime = 0
+}).catch(()=>{})
+}, { once: true })
+</script>
+
+<div class="topo">
+<div class="voltar" onclick="voltar()">⬅ Voltar</div>
+</div>
+
+<h3>📡 Liberação de Aluno</h3>
+
+<div class="container">
+
+<div id="reader"></div>
+
+<input id="matricula" placeholder="Digite a matrícula">
+<button class="btn-buscar" onclick="buscarPorMatricula()">Buscar</button>
+
+<div id="resultado" class="info">
+Status: aguardando...
+</div>
+
+<div id="pcsArea" style="display:none;">
+<select id="pcsSelect"></select>
+
+<div class="botoes-linha">
+<button class="btn-verde" onclick="liberarAluno()">LIBERAR</button>
+<button class="btn-vermelho" onclick="novaConsulta()">NOVA CONSULTA</button>
+</div>
+
+</div>
+
+</div>
+
+<footer>
+<p><i class="fas fa-school"></i> <b>EEMTI DRAGÃO DO MAR - L.E.I.</b></p>
+<p><i class="fas fa-code"></i> By <b>D.S.Montenegro</b> <i class="fas fa-bolt"></i></p>
+</footer>
+
+<!-- 🔊 SOM -->
+<audio id="beep" src="https://www.soundjay.com/buttons/sounds/beep-07.mp3"></audio>
+
+<script>
+
+const client = supabase.createClient(
+"https://fwemutmkbvnriqxxufhx.supabase.co",
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3ZW11dG1rYnZucmlxeHh1Zmh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNjM2MzMsImV4cCI6MjA4ODczOTYzM30.HCXIoI_r7_yGJntTPIizhrP4apxXV3Ahd6Jk2AkvKas"
+)
+
+let alunoAtual = null
+let lendo = false
+
+function tocarBeep(){
+const audio = document.getElementById("beep")
+
+audio.currentTime = 0
+audio.play().catch(()=>{})
+}
+
+function voltar(){
+window.location.href = " "
+}
+
+// SCANNER (INALTERADO)
+function iniciarScanner(){
+
+Quagga.init({
+inputStream:{
+type:"LiveStream",
+target:document.querySelector('#reader'),
+constraints:{
+facingMode:"environment",
+width:1280,
+height:720
+}
+},
+decoder:{readers:["code_128_reader"]}
+}, function(err){
+
+if(err){
+console.log(err)
+return
+}
+
+Quagga.start()
+
+})
+}
+
+// DETECÇÃO
+Quagga.onDetected(async function(data){
+
+if(lendo) return
+
+lendo = true
+Quagga.stop()
+
+tocarBeep()
+
+const codigo = data.codeResult.code
+
+const { data: aluno } = await client
+.from("provas_alunos")
+.select("*")
+.eq("codigo_barras", codigo)
+.single()
+
+if(!aluno){
+resultado.innerHTML = "Aluno não encontrado"
+lendo = false
+iniciarScanner()
+return
+}
+
+processarAluno(aluno)
+
+})
+
+// MATRÍCULA
+async function buscarPorMatricula(){
+
+const mat = matricula.value
+
+const { data: aluno } = await client
+.from("provas_alunos")
+.select("*")
+.eq("matricula", mat)
+.single()
+
+if(!aluno){
+resultado.innerHTML = "Aluno não encontrado"
+return
+}
+
+tocarBeep()
+
+lendo = true
+Quagga.stop()
+
+processarAluno(aluno)
+}
+
+// PROCESSAR
+async function processarAluno(aluno){
+
+alunoAtual = aluno
+
+resultado.innerHTML = `
+<b>Aluno:</b> ${aluno.nome}<br>
+<b>Turma:</b> ${aluno.turma}
+`
+
+const ano = parseInt(aluno.turma.charAt(0))
+
+const { data: pcs } = await client
+.from("provas_terminais")
+.select("*")
+.eq("status","livre")
+.eq("ano",ano)
+
+if(!pcs || pcs.length === 0){
+resultado.innerHTML += "<br>Sem PCs disponíveis"
+lendo = false
+iniciarScanner()
+return
+}
+
+pcsSelect.innerHTML=""
+
+pcs.forEach(pc=>{
+const op=document.createElement("option")
+op.value=pc.id
+op.text=pc.nome
+pcsSelect.appendChild(op)
+})
+
+pcsArea.style.display="block"
+}
+
+// LIBERAR
+async function liberarAluno(){
+
+const pcId = pcsSelect.value
+
+await client.from("provas_terminais")
+.update({status:"ocupado", aluno_id:alunoAtual.id})
+.eq("id", pcId)
+
+novaConsulta()
+}
+
+// NOVA CONSULTA
+function novaConsulta(){
+alunoAtual=null
+resultado.innerHTML="Status: aguardando..."
+pcsArea.style.display="none"
+matricula.value=""
+
+lendo=false
+iniciarScanner()
+}
+
+iniciarScanner()
+
+</script>
+
+</body>
+</html>
